@@ -1,0 +1,257 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectStatus {
+  PENDING_SCRIPT
+  SCRIPT_GENERATED
+  SCRIPT_APPROVED
+  SCRIPT_REJECTED
+  TRANSLATING
+  AUDIO_GENERATING
+  VIDEO_EDITING
+  THUMBNAIL_GENERATING
+  READY_TO_PUBLISH
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+
+enum WorkStatus {
+  PENDING
+  GENERATING
+  EDITING
+  DONE
+  FAILED
+}
+
+enum TranslationStatus {
+  PENDING
+  DONE
+  FAILED
+}
+
+enum VideoType {
+  LONG
+  SHORT
+}
+
+enum Platform {
+  YOUTUBE
+  TIKTOK
+}
+
+enum PublishStatus {
+  PENDING
+  UPLOADING
+  PUBLISHED
+  FAILED
+}
+
+model User {
+  id           String            @id @default(cuid())
+  email        String            @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  settings     UserSettings?
+  projects     Project[]
+  channels     Channel[]
+  backgrounds  BackgroundVideo[]
+}
+
+model UserSettings {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  viralScoreThreshold Float    @default(7.0)
+  defaultLanguages    String[] @default(["pt-BR", "en-US", "es-ES"])
+  defaultVoiceId      String   @default("21m00Tcm4TlvDq8ikWAM")
+  autoRunAfterApproval Boolean @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id          String       @id @default(cuid())
+  userId      String
+  theme       String
+  suggestion  String?
+  status      ProjectStatus @default(PENDING_SCRIPT)
+  viralScore  Float?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  script      Script?
+  translations Translation[]
+  audioFiles  AudioFile[]
+  videoFiles  VideoFile[]
+  thumbnail   Thumbnail?
+  publishJobs PublishJob[]
+  processingLogs ProcessingLog[]
+
+  @@index([userId, createdAt])
+}
+
+model Script {
+  id          String   @id @default(cuid())
+  projectId   String   @unique
+  content     String
+  summary     String
+  viralScore  Float
+  viralReason String
+  narratorGender String @default("female")
+  language    String   @default("pt-BR")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Translation {
+  id        String            @id @default(cuid())
+  projectId String
+  language  String
+  content   String
+  summary   String
+  status    TranslationStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  audioFiles AudioFile[]
+
+  @@unique([projectId, language])
+}
+
+model AudioFile {
+  id                String     @id @default(cuid())
+  projectId         String
+  translationId     String?
+  language          String
+  filePath          String
+  durationSeconds   Float?
+  elevenLabsVoiceId String
+  provider          String     @default("elevenlabs")
+  model             String?
+  voice             String?
+  attempt           Int        @default(0)
+  errorMessage      String?
+  errorStack        String?
+  status            WorkStatus @default(PENDING)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  project           Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  translation       Translation? @relation(fields: [translationId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, language])
+}
+
+model BackgroundVideo {
+  id              String   @id @default(cuid())
+  userId          String
+  originalName    String
+  filePath        String
+  durationSeconds Float
+  sizeBytes       BigInt
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VideoFile {
+  id              String    @id @default(cuid())
+  projectId       String
+  language        String
+  type            VideoType
+  partNumber      Int?
+  filePath        String
+  durationSeconds Float
+  status          WorkStatus @default(PENDING)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  publishJobs     PublishJob[]
+
+  @@unique([projectId, language, type, partNumber])
+}
+
+model Thumbnail {
+  id           String     @id @default(cuid())
+  projectId    String     @unique
+  filePath     String
+  prompt       String
+  provider     String     @default("openai")
+  model        String?
+  style        String     @default("cartoon")
+  width        Int?
+  height       Int?
+  errorMessage String?
+  metadataJson Json?
+  generatedAt  DateTime?
+  status       WorkStatus @default(PENDING)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ProcessingLog {
+  id           String   @id @default(cuid())
+  projectId    String?
+  entityType   String
+  entityId     String
+  action       String
+  status       String
+  message      String?
+  errorMessage String?
+  errorStack   String?
+  provider     String?
+  model        String?
+  voice        String?
+  attempt      Int?
+  metadataJson Json?
+  createdAt    DateTime @default(now())
+  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, action, createdAt])
+  @@index([entityType, entityId, createdAt])
+}
+
+model Channel {
+  id                  String       @id @default(cuid())
+  userId              String
+  platform            Platform
+  name                String
+  language            String
+  youtubeChannelId    String?
+  youtubeAccessToken  String?
+  youtubeRefreshToken String?
+  tiktokAccessToken   String?
+  tiktokRefreshToken  String?
+  isActive            Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publishJobs         PublishJob[]
+}
+
+model PublishJob {
+  id             String        @id @default(cuid())
+  projectId      String
+  channelId      String
+  videoFileId    String
+  status         PublishStatus @default(PENDING)
+  youtubeVideoId String?
+  tiktokVideoId  String?
+  errorMessage   String?
+  scheduledAt    DateTime?
+  publishedAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  channel        Channel       @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  videoFile      VideoFile     @relation(fields: [videoFileId], references: [id], onDelete: Cascade)
+}

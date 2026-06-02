@@ -1,0 +1,111 @@
+services:
+  traefik:
+    image: traefik:v3.5
+    restart: unless-stopped
+    environment:
+      DOCKER_API_VERSION: "1.44"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-letsencrypt:/letsencrypt
+      - ./traefik:/etc/traefik:ro
+    networks:
+      - videofactory-net
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - videofactory-net
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - videofactory-net
+
+  backend:
+    build:
+      context: ./video-core
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${BACKEND_PORT}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      IMAGE_PROVIDER: ${IMAGE_PROVIDER:-openai}
+      OPENAI_IMAGE_MODEL: ${OPENAI_IMAGE_MODEL:-gpt-image-1}
+      OPENAI_IMAGE_QUALITY: ${OPENAI_IMAGE_QUALITY:-medium}
+      OPENAI_TTS_MODEL: ${OPENAI_TTS_MODEL:-gpt-4o-mini-tts}
+      OPENAI_TTS_VOICE: ${OPENAI_TTS_VOICE:-alloy}
+      THUMBNAIL_STYLE: ${THUMBNAIL_STYLE:-cartoon}
+      THUMBNAIL_WIDTH: ${THUMBNAIL_WIDTH:-1280}
+      THUMBNAIL_HEIGHT: ${THUMBNAIL_HEIGHT:-720}
+      ELEVEN_LABS_API_KEY: ${ELEVEN_LABS_API_KEY}
+      ELEVEN_LABS_DEFAULT_VOICE_ID: ${ELEVEN_LABS_DEFAULT_VOICE_ID:-}
+      ELEVEN_LABS_MALE_VOICE_ID: ${ELEVEN_LABS_MALE_VOICE_ID:-}
+      ELEVEN_LABS_DEFAULT_MALE_VOICE_ID: ${ELEVEN_LABS_DEFAULT_MALE_VOICE_ID:-}
+      ELEVEN_LABS_FEMALE_VOICE_ID: ${ELEVEN_LABS_FEMALE_VOICE_ID:-}
+      MALE_EN_VOICE_ID: ${MALE_EN_VOICE_ID:-}
+      FEMALE_EN_VOICE_ID: ${FEMALE_EN_VOICE_ID:-}
+      MALE_ES_VOICE_ID: ${MALE_ES_VOICE_ID:-}
+      FEMALE_ES_VOICE_ID: ${FEMALE_ES_VOICE_ID:-}
+      MALE_PT_VOICE_ID: ${MALE_PT_VOICE_ID:-}
+      FEMALE_PT_VOICE_ID: ${FEMALE_PT_VOICE_ID:-}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      STORAGE_PATH: ${STORAGE_PATH}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
+      TIKTOK_CLIENT_KEY: ${TIKTOK_CLIENT_KEY}
+      TIKTOK_CLIENT_SECRET: ${TIKTOK_CLIENT_SECRET}
+    volumes:
+      - ./storage:/app/storage
+    networks:
+      - videofactory-net
+
+  frontend:
+    build:
+      context: ./video-front
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${FRONTEND_PORT}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    networks:
+      - videofactory-net
+
+volumes:
+  traefik-letsencrypt:
+  postgres-data:
+  redis-data:
+
+networks:
+  videofactory-net:
+    driver: bridge

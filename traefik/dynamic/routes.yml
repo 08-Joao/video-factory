@@ -1,0 +1,28 @@
+http:
+  routers:
+    video-front:
+      rule: Host(`video-factory.tehkly.com`)
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+      service: video-front
+
+    video-core:
+      rule: Host(`api-video.tehkly.com`)
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+      service: video-core
+
+  services:
+    video-front:
+      loadBalancer:
+        servers:
+          - url: http://frontend:3000
+
+    video-core:
+      loadBalancer:
+        servers:
+          - url: http://backend:3000

@@ -1,0 +1,72 @@
+# Dependencies
+node_modules/
+**/node_modules/
+.pnpm-store/
+**/.pnpm-store/
+.pnp
+.pnp.*
+
+# Build output
+dist/
+build/
+.next/
+out/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+
+# Runtime storage and generated media
+storage/
+*.mp3
+*.mp4
+*.webm
+*.mov
+*.wav
+*.m4a
+*.jpg
+*.jpeg
+*.png
+*.ass
+*.srt
+*.vtt
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Temp files
+.temp/
+.tmp/
+tmp/
+temp/
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.sublime-workspace
+
+# Docker/local certificates and runtime data
+traefik/letsencrypt/
+acme.json
